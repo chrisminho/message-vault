@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { fetchAllGlobalTransactions, fetchRegistrations, HUB_ADDRESS, type GlobalTxn } from '@/lib/algorand'
+import { fetchAllGlobalTransactions, HUB_ADDRESS, type GlobalTxn, type Registration } from '@/lib/algorand'
 import { shortenAddress, timeAgo } from '@/lib/types'
 
 interface TxnRow {
@@ -48,19 +48,13 @@ export default function AllTransactions() {
     setLoading(true)
     setError(null)
     try {
-      const txns = await fetchAllGlobalTransactions()
+      const { txns, registrations } = await fetchAllGlobalTransactions()
       const rows = txns.map(parseTxnRow)
 
-      // Resolve sender usernames
-      const uniqueAddrs = [...new Set(rows.map(r => r.from))]
-      try {
-        const regs = await fetchRegistrations(uniqueAddrs)
-        for (const row of rows) {
-          const reg = regs.get(row.from)
-          if (reg?.name) row.fromName = reg.name
-        }
-      } catch {
-        // continue without names
+      // Apply usernames from registrations we already fetched
+      for (const row of rows) {
+        const reg = registrations.get(row.from)
+        if (reg?.name) row.fromName = reg.name
       }
 
       setAllRows(rows)

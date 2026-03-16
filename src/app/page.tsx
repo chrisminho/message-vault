@@ -10,13 +10,17 @@ import { useState, useEffect } from 'react'
 
 export default function Home() {
   const { activeAddress } = useWallet()
-  const [tab, setTab] = useState<'inbox' | 'send' | 'feed'>('inbox')
+  const [tab, setTab] = useState<'inbox' | 'send' | 'feed'>(activeAddress ? 'inbox' : 'feed')
   const [mounted, setMounted] = useState(false)
   const [editingUsername, setEditingUsername] = useState(false)
 
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  useEffect(() => {
+    setTab(activeAddress ? 'inbox' : 'feed')
+  }, [activeAddress])
 
   return (
     <div className="app">
@@ -77,7 +81,7 @@ export default function Home() {
 
         {mounted && tab === 'send' && activeAddress && <SendMessage />}
 
-        {mounted && tab === 'feed' && <AllTransactions />}
+        {mounted && (tab === 'feed' || !activeAddress) && <AllTransactions />}
       </main>
 
       <footer className="footer">

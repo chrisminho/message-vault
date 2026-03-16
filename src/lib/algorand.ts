@@ -143,11 +143,17 @@ export async function fetchRegistrations(addresses: string[]): Promise<Map<strin
  * 3. Merging and sorting by timestamp (newest first)
  * Returns a flat list of all transactions across all users.
  */
-export async function fetchAllGlobalTransactions(): Promise<GlobalTxn[]> {
+export interface GlobalFeedResult {
+  txns: GlobalTxn[]
+  registrations: Map<string, Registration>
+}
+
+export async function fetchAllGlobalTransactions(): Promise<GlobalFeedResult> {
   // Step 1: Get all hub transactions (registrations, posts, replies)
   const hubTxns: GlobalTxn[] = []
   let nextToken: string | undefined
   const registeredAddresses = new Set<string>()
+  const registrations = new Map<string, Registration>()
 
   // Paginate through all hub transactions
   for (let page = 0; page < 10; page++) {
@@ -179,8 +185,12 @@ export async function fetchAllGlobalTransactions(): Promise<GlobalTxn[]> {
           payload: json,
           timestamp: txn.roundTime ?? txn['round-time'] ?? 0,
         })
-        if (json.type === 'register') {
+        if (json.type === 'register' && json.pk) {
           registeredAddresses.add(txn.sender as string)
+          // Keep latest registration per address (indexer returns newest first)
+          if (!registrations.has(txn.sender as string)) {
+            registrations.set(txn.sender as string, { pk: json.pk, name: json.name || undefined })
+          }
         }
       } catch { continue }
     }
@@ -227,7 +237,7 @@ export async function fetchAllGlobalTransactions(): Promise<GlobalTxn[]> {
 
   // Sort newest first
   allTxns.sort((a, b) => b.timestamp - a.timestamp)
-  return allTxns
+  return { txns: allTxns, registrations }
 }
 
 export interface GlobalTxn {
