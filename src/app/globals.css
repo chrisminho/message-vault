@@ -716,3 +716,113 @@ body {
 .loading {
   animation: pulse 1.5s infinite;
 }
+
+/* All Transactions Table */
+.all-txns {
+  padding-bottom: 40px;
+}
+
+.txn-table-wrap {
+  overflow-x: auto;
+}
+
+.txn-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.txn-table th {
+  text-align: left;
+  padding: 10px 12px;
+  color: var(--text-dim);
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid var(--border);
+}
+
+.txn-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.txn-table tbody tr:hover {
+  background: var(--bg-card);
+}
+
+.txn-addr {
+  font-family: monospace;
+  font-size: 0.8rem;
+}
+
+.txn-preview {
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-dim);
+}
+
+.txn-encrypted {
+  font-style: italic;
+  color: var(--text-dim);
+}
+
+.txn-hub {
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 0.8rem;
+}
+
+.txn-time {
+  white-space: nowrap;
+  color: var(--text-dim);
+  font-size: 0.8rem;
+}
+
+.txn-type-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.txn-type-dm {
+  background: rgba(108, 92, 231, 0.15);
+  color: var(--accent);
+}
+
+.txn-type-post {
+  background: rgba(0, 210, 160, 0.15);
+  color: var(--success);
+}
+
+.txn-type-reply {
+  background: rgba(0, 210, 160, 0.1);
+  color: var(--success);
+}
+
+.txn-type-register {
+  background: rgba(255, 107, 107, 0.15);
+  color: var(--error);
+}
+
+/* Pagination */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 16px 0;
+}
+
+.pagination-info {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}

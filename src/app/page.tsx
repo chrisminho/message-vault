@@ -4,12 +4,13 @@ import { useWallet } from '@txnlab/use-wallet-react'
 import ConnectWallet from '@/components/ConnectWallet'
 import Inbox from '@/components/Inbox'
 import SendMessage from '@/components/SendMessage'
+import AllTransactions from '@/components/AllTransactions'
 import RegisterButton from '@/components/RegisterButton'
 import { useState, useEffect } from 'react'
 
 export default function Home() {
   const { activeAddress } = useWallet()
-  const [tab, setTab] = useState<'inbox' | 'send'>('inbox')
+  const [tab, setTab] = useState<'inbox' | 'send' | 'feed'>('inbox')
   const [mounted, setMounted] = useState(false)
   const [editingUsername, setEditingUsername] = useState(false)
 
@@ -25,19 +26,29 @@ export default function Home() {
           <span className="tagline">Encrypted wallet-to-wallet messaging</span>
           <ConnectWallet onEditUsername={() => setEditingUsername(true)} />
         </div>
-        {mounted && activeAddress && (
+        {mounted && (
           <nav className="tab-nav">
+            {activeAddress && (
+              <>
+                <button
+                  className={`tab-btn ${tab === 'inbox' ? 'tab-active' : ''}`}
+                  onClick={() => setTab('inbox')}
+                >
+                  Inbox
+                </button>
+                <button
+                  className={`tab-btn ${tab === 'send' ? 'tab-active' : ''}`}
+                  onClick={() => setTab('send')}
+                >
+                  Send
+                </button>
+              </>
+            )}
             <button
-              className={`tab-btn ${tab === 'inbox' ? 'tab-active' : ''}`}
-              onClick={() => setTab('inbox')}
+              className={`tab-btn ${tab === 'feed' ? 'tab-active' : ''}`}
+              onClick={() => setTab('feed')}
             >
-              Inbox
-            </button>
-            <button
-              className={`tab-btn ${tab === 'send' ? 'tab-active' : ''}`}
-              onClick={() => setTab('send')}
-            >
-              Send
+              Feed
             </button>
           </nav>
         )}
@@ -65,6 +76,8 @@ export default function Home() {
         {mounted && tab === 'inbox' && activeAddress && <Inbox />}
 
         {mounted && tab === 'send' && activeAddress && <SendMessage />}
+
+        {mounted && tab === 'feed' && <AllTransactions />}
       </main>
 
       <footer className="footer">

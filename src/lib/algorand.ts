@@ -136,6 +136,110 @@ export async function fetchRegistrations(addresses: string[]): Promise<Map<strin
 /**
  * Fetch incoming DMs: transactions sent TO the given address with messagevault: note prefix.
  */
+/**
+ * Fetch ALL messagevault transactions globally by:
+ * 1. Getting all registered addresses from the hub
+ * 2. Querying each registered user's sent transactions
+ * 3. Merging and sorting by timestamp (newest first)
+ * Returns a flat list of all transactions across all users.
+ */
+export async function fetchAllGlobalTransactions(): Promise<GlobalTxn[]> {
+  // Step 1: Get all hub transactions (registrations, posts, replies)
+  const hubTxns: GlobalTxn[] = []
+  let nextToken: string | undefined
+  const registeredAddresses = new Set<string>()
+
+  // Paginate through all hub transactions
+  for (let page = 0; page < 10; page++) {
+    let query = indexerClient
+      .searchForTransactions()
+      .address(HUB_ADDRESS)
+      .addressRole('receiver')
+      .notePrefix(notePrefixBytes)
+      .txType('pay')
+      .limit(100)
+
+    if (nextToken) query = query.nextToken(nextToken)
+    const result = await query.do()
+    const txns = result.transactions || []
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const txn of txns as any[]) {
+      if (!txn.note || !txn.id) continue
+      const noteStr = decodeNote(txn.note)
+      if (!noteStr || !noteStr.startsWith('messagevault:')) continue
+      try {
+        const json = JSON.parse(noteStr.slice('messagevault:'.length))
+        const receiver = txn.paymentTransaction?.receiver ?? txn['payment-transaction']?.receiver ?? ''
+        hubTxns.push({
+          txId: txn.id,
+          type: json.type || 'unknown',
+          from: txn.sender,
+          to: receiver,
+          payload: json,
+          timestamp: txn.roundTime ?? txn['round-time'] ?? 0,
+        })
+        if (json.type === 'register') {
+          registeredAddresses.add(txn.sender as string)
+        }
+      } catch { continue }
+    }
+
+    nextToken = result.nextToken
+    if (!nextToken || txns.length === 0) break
+  }
+
+  // Step 2: For each registered address, fetch their sent transactions (captures DMs)
+  const hubTxIds = new Set(hubTxns.map(t => t.txId))
+  const dmFetches = Array.from(registeredAddresses).map(async (addr) => {
+    try {
+      const result = await fetchTransactionsByAddress(addr, 100)
+      const txns = result.transactions || []
+      const dmTxns: GlobalTxn[] = []
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      for (const txn of txns as any[]) {
+        if (!txn.note || !txn.id) continue
+        if (hubTxIds.has(txn.id)) continue // already have from hub query
+        const noteStr = decodeNote(txn.note)
+        if (!noteStr || !noteStr.startsWith('messagevault:')) continue
+        try {
+          const json = JSON.parse(noteStr.slice('messagevault:'.length))
+          const receiver = txn.paymentTransaction?.receiver ?? txn['payment-transaction']?.receiver ?? ''
+          dmTxns.push({
+            txId: txn.id,
+            type: json.type || 'unknown',
+            from: txn.sender,
+            to: receiver,
+            payload: json,
+            timestamp: txn.roundTime ?? txn['round-time'] ?? 0,
+          })
+        } catch { continue }
+      }
+      return dmTxns
+    } catch {
+      return []
+    }
+  })
+
+  const dmResults = await Promise.all(dmFetches)
+  const allTxns = [...hubTxns, ...dmResults.flat()]
+
+  // Sort newest first
+  allTxns.sort((a, b) => b.timestamp - a.timestamp)
+  return allTxns
+}
+
+export interface GlobalTxn {
+  txId: string
+  type: string
+  from: string
+  to: string
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  payload: any
+  timestamp: number
+}
+
 export async function fetchIncomingDMs(address: string, limit = 100) {
   return indexerClient
     .searchForTransactions()
