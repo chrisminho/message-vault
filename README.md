@@ -1,6 +1,8 @@
 # MessageVault
 
-Encrypted wallet-to-wallet messaging on Algorand. Send messages to any wallet — only the receiver can unlock them by signing with their wallet.
+Encrypted wallet-to-wallet messaging. Send messages to any wallet — only the receiver can unlock them by signing with their wallet.
+
+> Currently supports **Algorand** only. More chains coming soon.
 
 ## How It Works
 
