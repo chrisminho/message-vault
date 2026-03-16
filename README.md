@@ -43,7 +43,6 @@ NEXT_PUBLIC_INDEXER_PORT=443
 ```
 
 ## Tech Stack
-
 - [Next.js](https://nextjs.org/) — React framework
 - [algosdk](https://github.com/algorand/js-algorand-sdk) — Algorand SDK
 - [tweetnacl](https://tweetnacl.js.org/) — NaCl cryptography
@@ -51,5 +50,4 @@ NEXT_PUBLIC_INDEXER_PORT=443
 - [@perawallet/connect](https://github.com/perawallet/connect) — Pera Wallet adapter
 
 ## License
-
 [MIT](LICENSE)
