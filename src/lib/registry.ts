@@ -82,6 +82,46 @@ export async function registerOnContract(
 }
 
 /**
+ * Deregister from the smart contract registry.
+ * Deletes the sender's box and refunds the MBR deposit.
+ */
+export async function deregisterFromContract(
+  algodClient: algosdk.Algodv2,
+  signer: algosdk.TransactionSigner,
+  address: string
+): Promise<string> {
+  const suggestedParams = await algodClient.getTransactionParams().do()
+  const atc = new algosdk.AtomicTransactionComposer()
+
+  const contract = new algosdk.ABIContract({
+    name: 'MessageVaultRegistry',
+    methods: [
+      {
+        name: 'deregister',
+        args: [],
+        returns: { type: 'void' },
+      },
+    ],
+  })
+
+  const method = contract.getMethodByName('deregister')
+  const senderPk = algosdk.decodeAddress(address).publicKey
+
+  atc.addMethodCall({
+    appID: REGISTRY_APP_ID,
+    method,
+    methodArgs: [],
+    sender: address,
+    signer,
+    suggestedParams,
+    boxes: [{ appIndex: REGISTRY_APP_ID, name: senderPk }],
+  })
+
+  const result = await atc.execute(algodClient, 4)
+  return result.txIDs[result.txIDs.length - 1]
+}
+
+/**
  * Fetch a registration from the contract via direct box read.
  * Returns null if the box doesn't exist.
  */

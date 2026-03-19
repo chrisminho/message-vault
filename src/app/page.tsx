@@ -13,6 +13,7 @@ export default function Home() {
   const [tab, setTab] = useState<'inbox' | 'send' | 'feed'>(activeAddress ? 'inbox' : 'feed')
   const [mounted, setMounted] = useState(false)
   const [editingUsername, setEditingUsername] = useState(false)
+  const [registrationKey, setRegistrationKey] = useState(0)
 
   useEffect(() => {
     setMounted(true)
@@ -28,7 +29,10 @@ export default function Home() {
         <div className="header-inner">
           <h1 className="logo">MessageVault</h1>
           <span className="tagline">Encrypted wallet-to-wallet messaging</span>
-          <ConnectWallet onEditUsername={() => setEditingUsername(true)} />
+          <ConnectWallet
+            onEditUsername={() => setEditingUsername(true)}
+            onDeregistered={() => setRegistrationKey((k) => k + 1)}
+          />
         </div>
         {mounted && (
           <nav className="tab-nav">
@@ -60,6 +64,7 @@ export default function Home() {
 
       {mounted && activeAddress && (
         <RegisterButton
+          key={registrationKey}
           forceEdit={editingUsername}
           onEditDone={() => setEditingUsername(false)}
         />

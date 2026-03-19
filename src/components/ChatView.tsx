@@ -32,6 +32,7 @@ export default function ChatView({ activeAddress, peerAddress, keypair, onBack }
   const [sendError, setSendError] = useState<string | null>(null)
 
   const timelineEndRef = useRef<HTMLDivElement>(null)
+  const timelineRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     async function load() {
@@ -51,6 +52,13 @@ export default function ChatView({ activeAddress, peerAddress, keypair, onBack }
       }
     }
     load()
+    const interval = setInterval(async () => {
+      try {
+        const msgs = await fetchConversation(activeAddress, peerAddress)
+        setMessages(msgs)
+      } catch { /* silent */ }
+    }, 2000)
+    return () => clearInterval(interval)
   }, [activeAddress, peerAddress])
 
   // Scroll to bottom when messages change
@@ -64,6 +72,24 @@ export default function ChatView({ activeAddress, peerAddress, keypair, onBack }
       if (next.has(txId)) next.delete(txId)
       else next.add(txId)
       return next
+    })
+  }
+
+  // Compute which messages can be decrypted (for "Reveal All")
+  const decryptableIds = messages
+    .filter(msg => msg.direction === 'received' || msg.payload?.v === 2)
+    .map(msg => msg.txId)
+  const allRevealed = decryptableIds.length > 0 && decryptableIds.every(id => revealed.has(id))
+
+  function toggleRevealAll() {
+    if (allRevealed) {
+      setRevealed(new Set())
+    } else {
+      setRevealed(new Set(decryptableIds))
+    }
+    // Keep scroll at the bottom after content expands/collapses
+    requestAnimationFrame(() => {
+      timelineRef.current?.scrollTo({ top: timelineRef.current.scrollHeight })
     })
   }
 
@@ -142,9 +168,14 @@ export default function ChatView({ activeAddress, peerAddress, keypair, onBack }
           <span className="chat-header-name">{peerName || shortenAddress(peerAddress)}</span>
           {peerName && <span className="chat-header-addr">{shortenAddress(peerAddress)}</span>}
         </div>
+        {decryptableIds.length > 0 && (
+          <button className="btn btn-secondary btn-sm" onClick={toggleRevealAll} style={{ marginLeft: 'auto' }}>
+            {allRevealed ? 'Hide All' : 'Reveal All'}
+          </button>
+        )}
       </div>
 
-      <div className="chat-timeline">
+      <div className="chat-timeline" ref={timelineRef}>
         {loading ? (
           <div className="inbox-empty loading">
             <p>Loading messages...</p>

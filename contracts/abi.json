@@ -29,8 +29,7 @@
       "returns": {
         "type": "byte[]"
       },
-      "desc": "Read the encryption public key for an address.",
-      "readonly": true
+      "desc": "Read the encryption public key for an address."
     },
     {
       "name": "get_username",
@@ -43,8 +42,15 @@
       "returns": {
         "type": "string"
       },
-      "desc": "Read the username for an address.",
-      "readonly": true
+      "desc": "Read the username for an address."
+    },
+    {
+      "name": "deregister",
+      "args": [],
+      "returns": {
+        "type": "void"
+      },
+      "desc": "Deregister: delete sender's box and refund MBR."
     },
     {
       "name": "is_registered",
@@ -57,10 +63,8 @@
       "returns": {
         "type": "bool"
       },
-      "desc": "Check if an address has registered.",
-      "readonly": true
+      "desc": "Check if an address has registered."
     }
   ],
-  "desc": "MessageVault Key Registry - stores encryption public keys and usernames in box storage.",
   "networks": {}
 }

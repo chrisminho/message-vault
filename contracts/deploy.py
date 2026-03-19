@@ -37,8 +37,9 @@ NETWORKS = {
 
 def compile_teal(client: algod.AlgodClient, teal_source: str) -> bytes:
     """Compile TEAL source to bytecode."""
+    import base64
     result = client.compile(teal_source)
-    return bytes.fromhex(result["result"])
+    return base64.b64decode(result["result"])
 
 
 def main():

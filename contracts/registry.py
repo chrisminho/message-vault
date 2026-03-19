@@ -6,14 +6,14 @@ Box value: 32 bytes (encryption public key) + length-prefixed username (up to 32
 
 ABI methods:
   - register(byte[32], string) -> void — store/update pk + username, sender pays box MBR
-  - get_public_key(address) -> byte[32] — read-only box lookup
+  - get_public_key(address) -> byte[] — read-only box lookup
   - get_username(address) -> string — read-only
   - is_registered(address) -> bool — read-only
 """
 
+from typing import Literal
 from pyteal import *
 
-# Box key = 32-byte sender address (raw, no prefix)
 # Box value layout:
 #   bytes 0-31:  encryption public key (32 bytes)
 #   bytes 32-33: username length (2 bytes, big-endian)
@@ -55,11 +55,9 @@ def register(pk: abi.StaticBytes[Literal[32]], username: abi.String) -> Expr:
 
     return Seq(
         box_exists,
-        # Validate username length
         Assert(username_len <= MAX_USERNAME_LEN),
         If(
             Not(box_exists.hasValue()),
-            # New registration: require MBR payment in preceding txn
             Seq(
                 Assert(Global.group_size() >= Int(2)),
                 Assert(
@@ -73,19 +71,15 @@ def register(pk: abi.StaticBytes[Literal[32]], username: abi.String) -> Expr:
                 Assert(
                     Gtxn[Txn.group_index() - Int(1)].amount() >= BOX_MBR
                 ),
-                # Create box with max size
                 Pop(App.box_create(sender_key, MAX_BOX_SIZE)),
             ),
         ),
-        # Write public key (bytes 0-31)
         App.box_replace(sender_key, Int(0), pk.get()),
-        # Write username length (bytes 32-33, big-endian uint16)
         App.box_replace(
             sender_key,
             PK_SIZE,
             Extract(Itob(username_len), Int(6), Int(2)),
         ),
-        # Write username (bytes 34+)
         If(
             username_len > Int(0),
             App.box_replace(sender_key, PK_SIZE + LEN_PREFIX_SIZE, username_bytes),
@@ -94,31 +88,26 @@ def register(pk: abi.StaticBytes[Literal[32]], username: abi.String) -> Expr:
     )
 
 
-@router.method(read_only=True)
-def get_public_key(addr: abi.Address) -> Expr:
+@router.method
+def get_public_key(addr: abi.Address, *, output: abi.DynamicBytes) -> Expr:
     """Read the encryption public key for an address."""
     box_value = App.box_get(addr.get())
     return Seq(
         box_value,
         Assert(box_value.hasValue()),
-        output := abi.DynamicBytes(),
         output.set(Extract(box_value.value(), Int(0), PK_SIZE)),
-        abi.MethodReturn(output),
-        Approve(),
     )
 
 
-@router.method(read_only=True)
-def get_username(addr: abi.Address) -> Expr:
+@router.method
+def get_username(addr: abi.Address, *, output: abi.String) -> Expr:
     """Read the username for an address."""
     box_value = App.box_get(addr.get())
+    name_len = ScratchVar(TealType.uint64)
     return Seq(
         box_value,
         Assert(box_value.hasValue()),
-        (name_len := ScratchVar()).store(
-            ExtractUint16(box_value.value(), PK_SIZE)
-        ),
-        output := abi.String(),
+        name_len.store(ExtractUint16(box_value.value(), PK_SIZE)),
         output.set(
             Extract(
                 box_value.value(),
@@ -126,21 +115,34 @@ def get_username(addr: abi.Address) -> Expr:
                 name_len.load(),
             )
         ),
-        abi.MethodReturn(output),
+    )
+
+
+@router.method
+def deregister() -> Expr:
+    """Deregister: delete sender's box and refund MBR."""
+    sender_key = Txn.sender()
+    return Seq(
+        Assert(App.box_delete(sender_key)),
+        InnerTxnBuilder.Execute(
+            {
+                TxnField.type_enum: TxnType.Payment,
+                TxnField.receiver: Txn.sender(),
+                TxnField.amount: BOX_MBR,
+                TxnField.fee: Int(0),
+            }
+        ),
         Approve(),
     )
 
 
-@router.method(read_only=True)
-def is_registered(addr: abi.Address) -> Expr:
+@router.method
+def is_registered(addr: abi.Address, *, output: abi.Bool) -> Expr:
     """Check if an address has registered."""
     box_len = App.box_length(addr.get())
     return Seq(
         box_len,
-        output := abi.Bool(),
         output.set(box_len.hasValue()),
-        abi.MethodReturn(output),
-        Approve(),
     )
 
 

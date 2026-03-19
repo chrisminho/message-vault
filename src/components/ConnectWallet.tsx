@@ -1,19 +1,36 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useWallet } from '@txnlab/use-wallet-react'
 import { shortenAddress } from '@/lib/types'
-import { fetchRegistration } from '@/lib/algorand'
+import { algodClient, fetchRegistration } from '@/lib/algorand'
+import { deregisterFromContract } from '@/lib/registry'
 
 interface Props {
   onEditUsername?: () => void
+  onDeregistered?: () => void
 }
 
-export default function ConnectWallet({ onEditUsername }: Props) {
-  const { activeAddress, wallets } = useWallet()
+export default function ConnectWallet({ onEditUsername, onDeregistered }: Props) {
+  const { activeAddress, wallets, transactionSigner } = useWallet()
   const [mounted, setMounted] = useState(false)
   const [copied, setCopied] = useState(false)
   const [username, setUsername] = useState<string | undefined>()
+  const [deregistering, setDeregistering] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    if (!menuOpen) return
+    function handleMouseDown(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleMouseDown)
+    return () => document.removeEventListener('mousedown', handleMouseDown)
+  }, [menuOpen])
 
   useEffect(() => {
     setMounted(true)
@@ -28,6 +45,21 @@ export default function ConnectWallet({ onEditUsername }: Props) {
 
   if (!mounted) return null
 
+  async function handleDeregister() {
+    if (!activeAddress || !transactionSigner) return
+    if (!confirm('Deregister and reclaim your 0.042 ALGO deposit? You will no longer be able to receive encrypted messages.')) return
+    setDeregistering(true)
+    try {
+      await deregisterFromContract(algodClient, transactionSigner, activeAddress)
+      setUsername(undefined)
+      onDeregistered?.()
+    } catch (err) {
+      console.error('Deregistration failed:', err)
+    } finally {
+      setDeregistering(false)
+    }
+  }
+
   function handleCopy() {
     if (!activeAddress) return
     navigator.clipboard.writeText(activeAddress)
@@ -38,19 +70,14 @@ export default function ConnectWallet({ onEditUsername }: Props) {
   if (activeAddress) {
     const activeWallet = wallets?.find((w) => w.isActive)
     return (
-      <div className="wallet-connected">
-        <div className="wallet-info">
-          {username && (
-            <div className="wallet-username-row">
-              <span className="wallet-username">{username}</span>
-              <button className="btn btn-secondary btn-sm" onClick={onEditUsername}>Edit</button>
-            </div>
-          )}
+      <div className="wallet-connected" ref={menuRef}>
+        <div className="wallet-menu-trigger" onClick={() => setMenuOpen(prev => !prev)}>
+          {username && <span className="wallet-username">{username}</span>}
           <div className="wallet-address-row">
             <span className="wallet-address">{shortenAddress(activeAddress)}</span>
             <button
               className="btn-copy"
-              onClick={handleCopy}
+              onClick={(e) => { e.stopPropagation(); handleCopy() }}
               title="Copy address"
             >
               {copied ? (
@@ -66,12 +93,23 @@ export default function ConnectWallet({ onEditUsername }: Props) {
             </button>
           </div>
         </div>
-        <button
-          className="btn btn-secondary"
-          onClick={() => activeWallet?.disconnect()}
-        >
-          Disconnect
-        </button>
+        {menuOpen && (
+          <div className="wallet-dropdown">
+            {username && (
+              <button className="wallet-dropdown-item" onClick={() => { setMenuOpen(false); onEditUsername?.() }}>
+                Edit Username
+              </button>
+            )}
+            {username && (
+              <button className="wallet-dropdown-item" onClick={() => { setMenuOpen(false); handleDeregister() }} disabled={deregistering}>
+                {deregistering ? 'Deregistering...' : 'Deregister'}
+              </button>
+            )}
+            <button className="wallet-dropdown-item" onClick={() => { setMenuOpen(false); activeWallet?.disconnect() }}>
+              Disconnect
+            </button>
+          </div>
+        )}
       </div>
     )
   }

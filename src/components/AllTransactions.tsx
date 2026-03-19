@@ -51,7 +51,7 @@ export default function AllTransactions() {
       const { txns, registrations } = await fetchAllGlobalTransactions()
       const rows = txns.map(parseTxnRow)
 
-      // Apply usernames from registrations we already fetched
+      // Apply usernames from registrations
       for (const row of rows) {
         const reg = registrations.get(row.from)
         if (reg?.name) row.fromName = reg.name

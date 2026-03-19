@@ -1,0 +1,351 @@
+#pragma version 8
+txn NumAppArgs
+int 0
+==
+bnz main_l12
+txna ApplicationArgs 0
+method "register(byte[32],string)void"
+==
+bnz main_l11
+txna ApplicationArgs 0
+method "get_public_key(address)byte[]"
+==
+bnz main_l10
+txna ApplicationArgs 0
+method "get_username(address)string"
+==
+bnz main_l9
+txna ApplicationArgs 0
+method "deregister()void"
+==
+bnz main_l8
+txna ApplicationArgs 0
+method "is_registered(address)bool"
+==
+bnz main_l7
+err
+main_l7:
+txn OnCompletion
+int NoOp
+==
+txn ApplicationID
+int 0
+!=
+&&
+assert
+callsub isregisteredcaster_9
+int 1
+return
+main_l8:
+txn OnCompletion
+int NoOp
+==
+txn ApplicationID
+int 0
+!=
+&&
+assert
+callsub deregistercaster_8
+int 1
+return
+main_l9:
+txn OnCompletion
+int NoOp
+==
+txn ApplicationID
+int 0
+!=
+&&
+assert
+callsub getusernamecaster_7
+int 1
+return
+main_l10:
+txn OnCompletion
+int NoOp
+==
+txn ApplicationID
+int 0
+!=
+&&
+assert
+callsub getpublickeycaster_6
+int 1
+return
+main_l11:
+txn OnCompletion
+int NoOp
+==
+txn ApplicationID
+int 0
+!=
+&&
+assert
+callsub registercaster_5
+int 1
+return
+main_l12:
+txn OnCompletion
+int NoOp
+==
+bnz main_l18
+txn OnCompletion
+int UpdateApplication
+==
+bnz main_l17
+txn OnCompletion
+int DeleteApplication
+==
+bnz main_l16
+err
+main_l16:
+txn Sender
+global CreatorAddress
+==
+return
+main_l17:
+txn Sender
+global CreatorAddress
+==
+return
+main_l18:
+txn ApplicationID
+int 0
+==
+assert
+int 1
+return
+
+// register
+register_0:
+proto 2 0
+txn Sender
+box_get
+store 1
+store 0
+frame_dig -1
+extract 2 0
+len
+int 32
+<=
+assert
+load 1
+!
+bnz register_0_l3
+register_0_l1:
+txn Sender
+int 0
+frame_dig -2
+box_replace
+txn Sender
+int 32
+frame_dig -1
+extract 2 0
+len
+itob
+extract 6 2
+box_replace
+frame_dig -1
+extract 2 0
+len
+int 0
+>
+bz register_0_l4
+txn Sender
+int 32
+int 2
++
+frame_dig -1
+extract 2 0
+box_replace
+b register_0_l4
+register_0_l3:
+global GroupSize
+int 2
+>=
+assert
+txn GroupIndex
+int 1
+-
+gtxns TypeEnum
+int pay
+==
+assert
+txn GroupIndex
+int 1
+-
+gtxns Receiver
+global CurrentApplicationAddress
+==
+assert
+txn GroupIndex
+int 1
+-
+gtxns Amount
+int 41700
+>=
+assert
+txn Sender
+int 66
+box_create
+pop
+b register_0_l1
+register_0_l4:
+int 1
+return
+
+// get_public_key
+getpublickey_1:
+proto 1 1
+byte ""
+frame_dig -1
+box_get
+store 3
+store 2
+load 3
+assert
+load 2
+extract 0 32
+frame_bury 0
+frame_dig 0
+len
+itob
+extract 6 0
+frame_dig 0
+concat
+frame_bury 0
+retsub
+
+// get_username
+getusername_2:
+proto 1 1
+byte ""
+frame_dig -1
+box_get
+store 5
+store 4
+load 5
+assert
+load 4
+int 32
+extract_uint16
+store 6
+load 4
+int 32
+int 2
++
+load 6
+extract3
+frame_bury 0
+frame_dig 0
+len
+itob
+extract 6 0
+frame_dig 0
+concat
+frame_bury 0
+retsub
+
+// deregister
+deregister_3:
+proto 0 0
+txn Sender
+box_del
+assert
+itxn_begin
+int pay
+itxn_field TypeEnum
+txn Sender
+itxn_field Receiver
+int 41700
+itxn_field Amount
+int 0
+itxn_field Fee
+itxn_submit
+int 1
+return
+
+// is_registered
+isregistered_4:
+proto 1 1
+int 0
+frame_dig -1
+box_len
+store 8
+store 7
+load 8
+!
+!
+frame_bury 0
+retsub
+
+// register_caster
+registercaster_5:
+proto 0 0
+byte ""
+dup
+txna ApplicationArgs 1
+frame_bury 0
+txna ApplicationArgs 2
+frame_bury 1
+frame_dig 0
+frame_dig 1
+callsub register_0
+retsub
+
+// get_public_key_caster
+getpublickeycaster_6:
+proto 0 0
+byte ""
+dup
+txna ApplicationArgs 1
+frame_bury 1
+frame_dig 1
+callsub getpublickey_1
+frame_bury 0
+byte 0x151f7c75
+frame_dig 0
+concat
+log
+retsub
+
+// get_username_caster
+getusernamecaster_7:
+proto 0 0
+byte ""
+dup
+txna ApplicationArgs 1
+frame_bury 1
+frame_dig 1
+callsub getusername_2
+frame_bury 0
+byte 0x151f7c75
+frame_dig 0
+concat
+log
+retsub
+
+// deregister_caster
+deregistercaster_8:
+proto 0 0
+callsub deregister_3
+retsub
+
+// is_registered_caster
+isregisteredcaster_9:
+proto 0 0
+int 0
+byte ""
+txna ApplicationArgs 1
+frame_bury 1
+frame_dig 1
+callsub isregistered_4
+frame_bury 0
+byte 0x151f7c75
+byte 0x00
+int 0
+frame_dig 0
+setbit
+concat
+log
+retsub
