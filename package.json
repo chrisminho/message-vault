@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@blockshake/defly-connect": "^1.2.1",
     "@perawallet/connect": "^1.4.2",
     "@txnlab/use-wallet-react": "^4.6.0",
     "@types/ed2curve": "^0.2.4",
