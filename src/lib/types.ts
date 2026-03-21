@@ -1,3 +1,5 @@
+export type Chain = 'solana' | 'algorand'
+
 export const APP_PREFIX = 'messagevault:'
 
 export interface SocialPost {

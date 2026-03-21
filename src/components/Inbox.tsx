@@ -1,14 +1,19 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useWallet } from '@txnlab/use-wallet-react'
+import { useWallet as useAlgorandWallet } from '@txnlab/use-wallet-react'
+import { useWallet as useSolanaWallet } from '@solana/wallet-adapter-react'
+import { useChain } from '@/lib/chain-context'
 import nacl from 'tweetnacl'
 import { deriveEncryptionKeypair, loadKeypair, saveKeypair, clearKeypair } from '@/lib/crypto'
+import { deriveEncryptionKeypairSolana } from '@/lib/solana-crypto'
 import ConversationList from './ConversationList'
 import ChatView from './ChatView'
 
 export default function Inbox() {
-  const { activeAddress, signTransactions } = useWallet()
+  const { activeAddress, chain } = useChain()
+  const { signTransactions } = useAlgorandWallet()
+  const { signMessage } = useSolanaWallet()
   const [keypair, setKeypair] = useState<nacl.BoxKeyPair | null>(null)
   const [unlocking, setUnlocking] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -22,14 +27,20 @@ export default function Inbox() {
   }, [activeAddress])
 
   async function handleUnlock() {
-    if (!activeAddress) return
+    if (!activeAddress || !chain) return
     setUnlocking(true)
     setError(null)
     try {
-      const kp = await deriveEncryptionKeypair(
-        (txns) => signTransactions(txns),
-        activeAddress
-      )
+      let kp: nacl.BoxKeyPair
+      if (chain === 'solana') {
+        if (!signMessage) throw new Error('Wallet does not support message signing')
+        kp = await deriveEncryptionKeypairSolana(signMessage)
+      } else {
+        kp = await deriveEncryptionKeypair(
+          (txns) => signTransactions(txns),
+          activeAddress
+        )
+      }
       setKeypair(kp)
       saveKeypair(activeAddress, kp)
     } catch (err: unknown) {
@@ -49,6 +60,7 @@ export default function Inbox() {
   }
 
   if (!keypair) {
+    const unlockLabel = chain === 'solana' ? 'Sign a message to unlock your encrypted inbox.' : 'Sign a transaction to unlock your encrypted inbox.'
     return (
       <div className="inbox">
         <div className="inbox-header">
@@ -63,7 +75,7 @@ export default function Inbox() {
         </div>
         {error && <p className="error-msg">{error}</p>}
         <div className="inbox-empty">
-          <p>Sign a transaction to unlock your encrypted inbox.</p>
+          <p>{unlockLabel}</p>
         </div>
       </div>
     )

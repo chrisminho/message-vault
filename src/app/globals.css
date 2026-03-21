@@ -266,6 +266,67 @@ body {
   gap: 8px;
 }
 
+.wallet-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+
+.wallet-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+
+.wallet-group-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  min-width: 70px;
+}
+
+.wallet-group-buttons {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.wallet-group-buttons .btn {
+  padding: 6px 12px;
+  font-size: 0.8rem;
+}
+
+.wallet-group-disabled {
+  opacity: 0.5;
+}
+
+.wallet-group-coming-soon {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  font-style: italic;
+}
+
+.wallet-selector {
+  max-width: 420px;
+  margin: 0 auto 32px;
+}
+
+.wallet-chain-badge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--accent);
+  background: rgba(108, 92, 231, 0.15);
+  padding: 1px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
 .wallet-hint {
   font-size: 0.8rem;
   color: var(--text-dim);

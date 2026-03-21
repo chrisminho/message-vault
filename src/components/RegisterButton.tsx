@@ -1,11 +1,17 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { useWallet } from '@txnlab/use-wallet-react'
+import { useWallet as useAlgorandWallet } from '@txnlab/use-wallet-react'
+import { useWallet as useSolanaWallet } from '@solana/wallet-adapter-react'
+import { useConnection } from '@solana/wallet-adapter-react'
+import { useChain } from '@/lib/chain-context'
 import nacl from 'tweetnacl'
-import { algodClient, fetchRegistration } from '@/lib/algorand'
+import { PublicKey } from '@solana/web3.js'
+import { algodClient, fetchRegistration as fetchAlgorandRegistration } from '@/lib/algorand'
+import { fetchRegistration as fetchSolanaRegistration, register as solanaRegister } from '@/lib/solana'
 import { deriveEncryptionKeypair } from '@/lib/crypto'
-import { registerOnContract, deregisterFromContract } from '@/lib/registry'
+import { deriveEncryptionKeypairSolana } from '@/lib/solana-crypto'
+import { registerOnContract } from '@/lib/registry'
 
 interface Props {
   forceEdit?: boolean
@@ -13,7 +19,10 @@ interface Props {
 }
 
 export default function RegisterButton({ forceEdit, onEditDone }: Props) {
-  const { activeAddress, signTransactions, transactionSigner } = useWallet()
+  const { activeAddress, chain } = useChain()
+  const { signTransactions, transactionSigner } = useAlgorandWallet()
+  const { signMessage, signTransaction: solanaSignTransaction } = useSolanaWallet()
+  const { connection: solanaConnection } = useConnection()
   const [registered, setRegistered] = useState<boolean | null>(null)
   const [needsMigration, setNeedsMigration] = useState(false)
   const [currentName, setCurrentName] = useState<string | undefined>()
@@ -24,13 +33,14 @@ export default function RegisterButton({ forceEdit, onEditDone }: Props) {
   const keypairRef = useRef<nacl.BoxKeyPair | null>(null)
 
   const checkRegistration = useCallback(async () => {
-    if (!activeAddress) return
+    if (!activeAddress || !chain) return
+    const fetchRegistration = chain === 'solana' ? fetchSolanaRegistration : fetchAlgorandRegistration
     const existing = await fetchRegistration(activeAddress)
     setRegistered(existing !== null)
-    setNeedsMigration(existing?.source === 'hub')
+    setNeedsMigration(chain === 'algorand' && (existing as any)?.source === 'hub')
     setCurrentName(existing?.name)
     if (existing?.name) setUsername(existing.name)
-  }, [activeAddress])
+  }, [activeAddress, chain])
 
   useEffect(() => {
     checkRegistration()
@@ -50,14 +60,20 @@ export default function RegisterButton({ forceEdit, onEditDone }: Props) {
   }
 
   async function handleDeriveKey() {
-    if (!activeAddress) return
+    if (!activeAddress || !chain) return
     setError(null)
     setStep('signing')
     try {
-      const kp = await deriveEncryptionKeypair(
-        (txns) => signTransactions(txns),
-        activeAddress
-      )
+      let kp: nacl.BoxKeyPair
+      if (chain === 'solana') {
+        if (!signMessage) throw new Error('Wallet does not support message signing')
+        kp = await deriveEncryptionKeypairSolana(signMessage)
+      } else {
+        kp = await deriveEncryptionKeypair(
+          (txns) => signTransactions(txns),
+          activeAddress
+        )
+      }
       keypairRef.current = kp
       setStep('ready')
     } catch (err: unknown) {
@@ -68,17 +84,29 @@ export default function RegisterButton({ forceEdit, onEditDone }: Props) {
   }
 
   async function handlePublish() {
-    if (!keypairRef.current || !activeAddress || !transactionSigner) return
+    if (!keypairRef.current || !activeAddress || !chain) return
     setError(null)
     setStep('publishing')
     try {
-      await registerOnContract(
-        algodClient,
-        transactionSigner,
-        activeAddress,
-        keypairRef.current.publicKey,
-        username.trim() || undefined
-      )
+      if (chain === 'solana') {
+        if (!solanaSignTransaction) throw new Error('Wallet does not support transaction signing')
+        await solanaRegister(
+          new PublicKey(activeAddress),
+          keypairRef.current.publicKey,
+          username.trim() || undefined,
+          solanaSignTransaction,
+          solanaConnection
+        )
+      } else {
+        if (!transactionSigner) throw new Error('No transaction signer available')
+        await registerOnContract(
+          algodClient,
+          transactionSigner,
+          activeAddress,
+          keypairRef.current.publicKey,
+          username.trim() || undefined
+        )
+      }
 
       setCurrentName(username.trim() || undefined)
       setRegistered(true)
@@ -91,16 +119,20 @@ export default function RegisterButton({ forceEdit, onEditDone }: Props) {
     }
   }
 
-  if (!activeAddress || registered === null) return null
+  if (!activeAddress || !chain || registered === null) return null
 
-  // Already registered on contract and not editing — status shown in header
+  // Already registered and not editing
   if (registered && !needsMigration && !editing) return null
+
+  const depositMessage = chain === 'algorand'
+    ? ' (0.042 ALGO refundable deposit)'
+    : ''
 
   const bannerMessage = editing
     ? 'Sign to update your username'
     : needsMigration
-      ? 'Upgrade to on-chain registry (0.042 ALGO refundable deposit)'
-      : 'Register to receive encrypted messages (0.042 ALGO refundable deposit)'
+      ? `Upgrade to on-chain registry${depositMessage}`
+      : `Register to receive encrypted messages${depositMessage}`
 
   return (
     <div className="register-banner">

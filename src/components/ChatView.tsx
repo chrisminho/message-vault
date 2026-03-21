@@ -1,14 +1,30 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { useWallet } from '@txnlab/use-wallet-react'
+import { useWallet as useAlgorandWallet } from '@txnlab/use-wallet-react'
+import { useWallet as useSolanaWallet } from '@solana/wallet-adapter-react'
+import { useConnection } from '@solana/wallet-adapter-react'
+import { useChain } from '@/lib/chain-context'
 import nacl from 'tweetnacl'
 import algosdk from 'algosdk'
-import { algodClient, fetchConversation, fetchRegistration, type ConversationMessage } from '@/lib/algorand'
+import { PublicKey } from '@solana/web3.js'
+import { algodClient, fetchConversation as fetchAlgorandConversation, fetchRegistration as fetchAlgorandRegistration, type ConversationMessage } from '@/lib/algorand'
+import { fetchConversation as fetchSolanaConversation, fetchRegistration as fetchSolanaRegistration, sendDM as solanaSendDM, type SolanaConversationMessage } from '@/lib/solana'
 import { decryptDM, encryptForPeer, encryptForRegisteredKey, loadKeypair } from '@/lib/crypto'
 import { shortenAddress, timeAgo } from '@/lib/types'
 
 const MAX_MESSAGE_LENGTH = 600
+
+// Unified message type for rendering
+interface ChatMessage {
+  txId: string
+  sender: string
+  receiver: string
+  timestamp: number
+  direction: 'sent' | 'received'
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  payload: any
+}
 
 interface ChatViewProps {
   activeAddress: string
@@ -18,8 +34,11 @@ interface ChatViewProps {
 }
 
 export default function ChatView({ activeAddress, peerAddress, keypair, onBack }: ChatViewProps) {
-  const { transactionSigner } = useWallet()
-  const [messages, setMessages] = useState<ConversationMessage[]>([])
+  const { chain } = useChain()
+  const { transactionSigner } = useAlgorandWallet()
+  const { signTransaction: solanaSignTransaction } = useSolanaWallet()
+  const { connection: solanaConnection } = useConnection()
+  const [messages, setMessages] = useState<ChatMessage[]>([])
   const [loading, setLoading] = useState(true)
   const [peerName, setPeerName] = useState<string | null>(null)
   const [peerPk, setPeerPk] = useState<string | null>(null)
@@ -34,6 +53,13 @@ export default function ChatView({ activeAddress, peerAddress, keypair, onBack }
   const timelineEndRef = useRef<HTMLDivElement>(null)
   const timelineRef = useRef<HTMLDivElement>(null)
 
+  const fetchConversation = chain === 'solana' ? fetchSolanaConversation : fetchAlgorandConversation
+  const fetchRegistration = chain === 'solana' ? fetchSolanaRegistration : fetchAlgorandRegistration
+
+  const explorerTxUrl = chain === 'solana'
+    ? (txId: string) => `https://solscan.io/tx/${txId}`
+    : (txId: string) => `https://explorer.perawallet.app/tx/${txId}`
+
   useEffect(() => {
     async function load() {
       setLoading(true)
@@ -42,7 +68,7 @@ export default function ChatView({ activeAddress, peerAddress, keypair, onBack }
           fetchConversation(activeAddress, peerAddress),
           fetchRegistration(peerAddress),
         ])
-        setMessages(msgs)
+        setMessages(msgs as ChatMessage[])
         if (reg?.name) setPeerName(reg.name)
         if (reg?.pk) setPeerPk(reg.pk)
       } catch {
@@ -55,11 +81,11 @@ export default function ChatView({ activeAddress, peerAddress, keypair, onBack }
     const interval = setInterval(async () => {
       try {
         const msgs = await fetchConversation(activeAddress, peerAddress)
-        setMessages(msgs)
+        setMessages(msgs as ChatMessage[])
       } catch { /* silent */ }
     }, 2000)
     return () => clearInterval(interval)
-  }, [activeAddress, peerAddress])
+  }, [activeAddress, peerAddress, chain])
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -87,19 +113,14 @@ export default function ChatView({ activeAddress, peerAddress, keypair, onBack }
     } else {
       setRevealed(new Set(decryptableIds))
     }
-    // Keep scroll at the bottom after content expands/collapses
     requestAnimationFrame(() => {
       timelineRef.current?.scrollTo({ top: timelineRef.current.scrollHeight })
     })
   }
 
-  function decryptMsg(msg: ConversationMessage): string | null {
-    // For v2 messages, both sent and received can be decrypted via ECDH shared key
-    // For v1 sent messages, we can't decrypt (ephemeral key is lost)
+  function decryptMsg(msg: ChatMessage): string | null {
     const isV2 = msg.payload?.v === 2
     if (msg.direction === 'sent' && !isV2) return null
-
-    // Determine peer public key for ECDH
     const peerKey = peerPk || undefined
     return decryptDM(msg.payload, keypair.secretKey, peerKey)
   }
@@ -112,37 +133,46 @@ export default function ChatView({ activeAddress, peerAddress, keypair, onBack }
   }
 
   async function handleSend() {
-    if (!text.trim() || !activeAddress || !transactionSigner) return
+    if (!text.trim() || !activeAddress) return
     setSending(true)
     setSendError(null)
     try {
       const reg = await fetchRegistration(peerAddress)
       if (!reg) throw new Error('Recipient has not enabled messaging yet.')
 
-      // Use ECDH v2 encryption if we have our keypair, otherwise fall back to v1
       const localKp = loadKeypair(activeAddress)
       const note = localKp
         ? encryptForPeer(text.trim(), reg.pk, localKp.secretKey)
         : encryptForRegisteredKey(text.trim(), reg.pk)
       if (note.length > 1024) throw new Error('Message too long for a single transaction note.')
 
-      const suggestedParams = await algodClient.getTransactionParams().do()
-      const txn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
-        sender: activeAddress,
-        receiver: peerAddress,
-        amount: 0,
-        suggestedParams,
-        note,
-      })
-
-      const atc = new algosdk.AtomicTransactionComposer()
-      atc.addTransaction({ txn, signer: transactionSigner })
-      await atc.execute(algodClient, 4)
+      if (chain === 'solana') {
+        if (!solanaSignTransaction) throw new Error('Wallet does not support transaction signing')
+        await solanaSendDM(
+          new PublicKey(activeAddress),
+          peerAddress,
+          note,
+          solanaSignTransaction,
+          solanaConnection
+        )
+      } else {
+        if (!transactionSigner) throw new Error('No transaction signer available')
+        const suggestedParams = await algodClient.getTransactionParams().do()
+        const txn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
+          sender: activeAddress,
+          receiver: peerAddress,
+          amount: 0,
+          suggestedParams,
+          note,
+        })
+        const atc = new algosdk.AtomicTransactionComposer()
+        atc.addTransaction({ txn, signer: transactionSigner })
+        await atc.execute(algodClient, 4)
+      }
 
       setText('')
-      // Reload conversation to show the new message
       const msgs = await fetchConversation(activeAddress, peerAddress)
-      setMessages(msgs)
+      setMessages(msgs as ChatMessage[])
     } catch (err: unknown) {
       setSendError(err instanceof Error ? err.message : 'Failed to send')
     } finally {
@@ -156,7 +186,6 @@ export default function ChatView({ activeAddress, peerAddress, keypair, onBack }
       handleSend()
     }
   }
-
 
   return (
     <div className="chat-view">
@@ -234,7 +263,7 @@ export default function ChatView({ activeAddress, peerAddress, keypair, onBack }
                   <span className="chat-bubble-time">{timeAgo(msg.timestamp)}</span>
                   <a
                     className="btn-action"
-                    href={`https://explorer.perawallet.app/tx/${msg.txId}`}
+                    href={explorerTxUrl(msg.txId)}
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={(e) => e.stopPropagation()}

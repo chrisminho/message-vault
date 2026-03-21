@@ -1,22 +1,30 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { useWallet } from '@txnlab/use-wallet-react'
+import { useWallet as useAlgorandWallet } from '@txnlab/use-wallet-react'
+import { useWallet as useSolanaWallet } from '@solana/wallet-adapter-react'
+import { useConnection } from '@solana/wallet-adapter-react'
+import { useChain } from '@/lib/chain-context'
 import algosdk from 'algosdk'
-import { algodClient, fetchRegistration, fetchKnownSenders, type KnownContact } from '@/lib/algorand'
+import { PublicKey } from '@solana/web3.js'
+import { algodClient, fetchRegistration as fetchAlgorandRegistration, fetchKnownSenders as fetchAlgorandKnownSenders, type KnownContact } from '@/lib/algorand'
+import { fetchRegistration as fetchSolanaRegistration, fetchKnownSenders as fetchSolanaKnownSenders, sendDM as solanaSendDM, validateSolanaAddress, type SolanaKnownContact } from '@/lib/solana'
 import { encryptForPeer, encryptForRegisteredKey, loadKeypair } from '@/lib/crypto'
 import { shortenAddress } from '@/lib/types'
 
 const MAX_MESSAGE_LENGTH = 600
 
 export default function SendMessage() {
-  const { activeAddress, transactionSigner } = useWallet()
+  const { activeAddress, chain } = useChain()
+  const { transactionSigner } = useAlgorandWallet()
+  const { signTransaction: solanaSignTransaction } = useSolanaWallet()
+  const { connection: solanaConnection } = useConnection()
   const [recipient, setRecipient] = useState('')
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [txId, setTxId] = useState<string | null>(null)
-  const [contacts, setContacts] = useState<KnownContact[]>([])
+  const [contacts, setContacts] = useState<(KnownContact | SolanaKnownContact)[]>([])
   const [showDropdown, setShowDropdown] = useState(false)
   const wrapperRef = useRef<HTMLDivElement>(null)
 
@@ -31,29 +39,43 @@ export default function SendMessage() {
   }, [])
 
   useEffect(() => {
-    if (activeAddress) {
-      fetchKnownSenders(activeAddress).then(setContacts)
+    if (!activeAddress || !chain) return
+    if (chain === 'solana') {
+      fetchSolanaKnownSenders(activeAddress).then(setContacts)
+    } else {
+      fetchAlgorandKnownSenders(activeAddress).then(setContacts)
     }
-  }, [activeAddress])
+  }, [activeAddress, chain])
+
+  const explorerTxUrl = chain === 'solana'
+    ? (id: string) => `https://solscan.io/tx/${id}`
+    : (id: string) => `https://explorer.perawallet.app/tx/${id}`
 
   async function handleSend() {
-    if (!text.trim() || !recipient.trim() || !activeAddress || !transactionSigner) return
+    if (!text.trim() || !recipient.trim() || !activeAddress || !chain) return
 
     setSending(true)
     setError(null)
     setTxId(null)
 
     try {
-      if (recipient.length !== 58) {
-        throw new Error('Invalid Algorand address (must be 58 characters).')
+      // Chain-aware address validation
+      if (chain === 'algorand') {
+        if (recipient.length !== 58) {
+          throw new Error('Invalid Algorand address (must be 58 characters).')
+        }
+      } else if (chain === 'solana') {
+        if (!validateSolanaAddress(recipient.trim())) {
+          throw new Error('Invalid Solana address.')
+        }
       }
 
+      const fetchRegistration = chain === 'solana' ? fetchSolanaRegistration : fetchAlgorandRegistration
       const reg = await fetchRegistration(recipient.trim())
       if (!reg) {
         throw new Error('Recipient has not enabled messaging yet. They need to register first.')
       }
 
-      // Use ECDH v2 encryption if we have a local keypair, otherwise fall back to v1
       const localKp = activeAddress ? loadKeypair(activeAddress) : null
       const note = localKp
         ? encryptForPeer(text.trim(), reg.pk, localKp.secretKey)
@@ -63,21 +85,34 @@ export default function SendMessage() {
         throw new Error('Message too long for a single transaction note.')
       }
 
-      const suggestedParams = await algodClient.getTransactionParams().do()
+      let resultTxId: string
 
-      const txn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
-        sender: activeAddress,
-        receiver: recipient.trim(),
-        amount: 0,
-        suggestedParams,
-        note,
-      })
+      if (chain === 'solana') {
+        if (!solanaSignTransaction) throw new Error('Wallet does not support transaction signing')
+        resultTxId = await solanaSendDM(
+          new PublicKey(activeAddress),
+          recipient.trim(),
+          note,
+          solanaSignTransaction,
+          solanaConnection
+        )
+      } else {
+        if (!transactionSigner) throw new Error('No transaction signer available')
+        const suggestedParams = await algodClient.getTransactionParams().do()
+        const txn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
+          sender: activeAddress,
+          receiver: recipient.trim(),
+          amount: 0,
+          suggestedParams,
+          note,
+        })
+        const atc = new algosdk.AtomicTransactionComposer()
+        atc.addTransaction({ txn, signer: transactionSigner })
+        const result = await atc.execute(algodClient, 4)
+        resultTxId = result.txIDs[0]
+      }
 
-      const atc = new algosdk.AtomicTransactionComposer()
-      atc.addTransaction({ txn, signer: transactionSigner })
-      const result = await atc.execute(algodClient, 4)
-
-      setTxId(result.txIDs[0])
+      setTxId(resultTxId)
       setText('')
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to send message'
@@ -95,6 +130,10 @@ export default function SendMessage() {
     )
   }
 
+  const addressPlaceholder = chain === 'solana'
+    ? (contacts.length > 0 ? 'Select contact or enter Solana address' : 'Recipient Solana address')
+    : (contacts.length > 0 ? 'Select contact or enter Algorand address' : 'Recipient Algorand address')
+
   return (
     <div className="send-message-page">
       <h3>Send Message</h3>
@@ -103,7 +142,7 @@ export default function SendMessage() {
           <input
             className="composer-input"
             type="text"
-            placeholder={contacts.length > 0 ? "Select contact or enter address" : "Recipient wallet address"}
+            placeholder={addressPlaceholder}
             value={recipient}
             onChange={(e) => { setRecipient(e.target.value); setShowDropdown(false) }}
             onFocus={() => { if (contacts.length > 0) setShowDropdown(true) }}
@@ -150,7 +189,7 @@ export default function SendMessage() {
         <p className="success-msg">
           Sent!{' '}
           <a
-            href={`https://explorer.perawallet.app/tx/${txId}`}
+            href={explorerTxUrl(txId)}
             target="_blank"
             rel="noopener noreferrer"
           >

@@ -1,16 +1,16 @@
 'use client'
 
-import { useWallet } from '@txnlab/use-wallet-react'
+import { useChain } from '@/lib/chain-context'
 import ConnectWallet from '@/components/ConnectWallet'
+import WalletSelector from '@/components/WalletSelector'
 import Inbox from '@/components/Inbox'
 import SendMessage from '@/components/SendMessage'
-import AllTransactions from '@/components/AllTransactions'
 import RegisterButton from '@/components/RegisterButton'
 import { useState, useEffect } from 'react'
 
 export default function Home() {
-  const { activeAddress } = useWallet()
-  const [tab, setTab] = useState<'inbox' | 'send' | 'feed'>(activeAddress ? 'inbox' : 'feed')
+  const { activeAddress, chain } = useChain()
+  const [tab, setTab] = useState<'inbox' | 'send'>('inbox')
   const [mounted, setMounted] = useState(false)
   const [editingUsername, setEditingUsername] = useState(false)
   const [registrationKey, setRegistrationKey] = useState(0)
@@ -18,10 +18,6 @@ export default function Home() {
   useEffect(() => {
     setMounted(true)
   }, [])
-
-  useEffect(() => {
-    setTab(activeAddress ? 'inbox' : 'feed')
-  }, [activeAddress])
 
   return (
     <div className="app">
@@ -34,29 +30,19 @@ export default function Home() {
             onDeregistered={() => setRegistrationKey((k) => k + 1)}
           />
         </div>
-        {mounted && (
+        {mounted && activeAddress && (
           <nav className="tab-nav">
-            {activeAddress && (
-              <>
-                <button
-                  className={`tab-btn ${tab === 'inbox' ? 'tab-active' : ''}`}
-                  onClick={() => setTab('inbox')}
-                >
-                  Inbox
-                </button>
-                <button
-                  className={`tab-btn ${tab === 'send' ? 'tab-active' : ''}`}
-                  onClick={() => setTab('send')}
-                >
-                  Send
-                </button>
-              </>
-            )}
             <button
-              className={`tab-btn ${tab === 'feed' ? 'tab-active' : ''}`}
-              onClick={() => setTab('feed')}
+              className={`tab-btn ${tab === 'inbox' ? 'tab-active' : ''}`}
+              onClick={() => setTab('inbox')}
             >
-              Feed
+              Inbox
+            </button>
+            <button
+              className={`tab-btn ${tab === 'send' ? 'tab-active' : ''}`}
+              onClick={() => setTab('send')}
+            >
+              Send
             </button>
           </nav>
         )}
@@ -72,26 +58,27 @@ export default function Home() {
 
       <main className="main">
         {(!mounted || !activeAddress) && (
-          <div className="hero">
-            <h2>Encrypted messages, unlocked by your wallet</h2>
-            <p>
-              Send encrypted messages to any Algorand wallet. Only the
-              receiver can open them by signing with their wallet.
-              No servers, no passwords — your wallet is the key.
-            </p>
-          </div>
+          <>
+            <div className="hero">
+              <h2>Encrypted messages, unlocked by your wallet</h2>
+              <p>
+                Send encrypted messages to any wallet. Only the
+                receiver can open them by signing with their wallet.
+                No servers, no passwords — your wallet is the key.
+              </p>
+            </div>
+            {mounted && <WalletSelector />}
+          </>
         )}
 
         {mounted && tab === 'inbox' && activeAddress && <Inbox />}
 
         {mounted && tab === 'send' && activeAddress && <SendMessage />}
-
-        {mounted && (tab === 'feed' || !activeAddress) && <AllTransactions />}
       </main>
 
       <footer className="footer">
         <p>
-          Messages are encrypted on Algorand MainNet.
+          Messages are encrypted on-chain.
           <br />
           Only the receiver can unlock them with their wallet.
         </p>
