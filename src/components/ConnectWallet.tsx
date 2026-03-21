@@ -6,6 +6,8 @@ import { shortenAddress } from '@/lib/types'
 import { algodClient, fetchRegistration } from '@/lib/algorand'
 import { deregisterFromContract } from '@/lib/registry'
 
+const EXODUS_EXTENSION_URL = 'https://www.exodus.com/web3-wallet'
+
 interface Props {
   onEditUsername?: () => void
   onDeregistered?: () => void
@@ -18,6 +20,7 @@ export default function ConnectWallet({ onEditUsername, onDeregistered }: Props)
   const [username, setUsername] = useState<string | undefined>()
   const [deregistering, setDeregistering] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [connectError, setConnectError] = useState<{ walletId: string; message: string } | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
 
   // Close dropdown on outside click
@@ -114,17 +117,42 @@ export default function ConnectWallet({ onEditUsername, onDeregistered }: Props)
     )
   }
 
+  async function handleConnect(wallet: typeof wallets[number]) {
+    setConnectError(null)
+    try {
+      await wallet.connect()
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Connection failed'
+      setConnectError({ walletId: wallet.id, message: msg })
+    }
+  }
+
+  const isExodusAvailable = typeof window !== 'undefined' && 'algorand' in window
+
   return (
-    <div className="wallet-options">
-      {wallets?.map((wallet) => (
-        <button
-          key={wallet.id}
-          className="btn btn-primary"
-          onClick={() => wallet.connect()}
-        >
-          Connect {wallet.metadata.name}
-        </button>
-      ))}
+    <div className="wallet-options-wrap">
+      <div className="wallet-options">
+        {wallets?.map((wallet) => (
+          <button
+            key={wallet.id}
+            className="btn btn-primary"
+            onClick={() => handleConnect(wallet)}
+          >
+            Connect {wallet.metadata.name}
+          </button>
+        ))}
+      </div>
+      {connectError?.walletId === 'exodus' && !isExodusAvailable && (
+        <p className="wallet-hint">
+          Exodus browser extension required.{' '}
+          <a href={EXODUS_EXTENSION_URL} target="_blank" rel="noopener noreferrer">
+            Install Exodus Web3 Wallet
+          </a>
+        </p>
+      )}
+      {connectError && !(connectError.walletId === 'exodus' && !isExodusAvailable) && (
+        <p className="error-msg">{connectError.message}</p>
+      )}
     </div>
   )
 }

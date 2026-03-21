@@ -254,9 +254,26 @@ body {
   color: var(--accent);
 }
 
+.wallet-options-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
 .wallet-options {
   display: flex;
   gap: 8px;
+}
+
+.wallet-hint {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
+.wallet-hint a {
+  color: var(--accent);
+  text-decoration: underline;
 }
 
 /* Hero */
