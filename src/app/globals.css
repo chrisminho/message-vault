@@ -267,61 +267,83 @@ body {
 }
 
 .wallet-selector {
-  max-width: 480px;
+  max-width: 700px;
   margin: 0 auto 32px;
 }
 
-.wallet-chains {
+.wallet-columns {
   display: flex;
-  flex-direction: column;
-  gap: 20px;
+  gap: 16px;
   width: 100%;
+  align-items: flex-start;
 }
 
-.wallet-chain-section {
+.wallet-column {
+  flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
 }
 
-.wallet-chain-header {
+.wallet-column-header {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
 }
 
-.wallet-chain-name {
+.wallet-column-chain {
   font-size: 0.9rem;
   font-weight: 700;
   color: var(--text);
 }
 
-.wallet-chain-wallets {
+.wallet-column-soon {
+  font-size: 0.65rem;
+  color: var(--text-dim);
+  font-style: italic;
+  margin-left: auto;
+  background: var(--bg-input);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.wallet-column-list {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
+.wallet-column-disabled {
+  opacity: 0.45;
+}
+
 .wallet-card {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   width: 100%;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 12px 16px;
+  background: var(--bg-input);
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 10px 12px;
   cursor: pointer;
   transition: all 0.15s;
   color: var(--text);
   font-family: inherit;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   font-weight: 600;
 }
 
 .wallet-card:hover:not(:disabled) {
   border-color: var(--accent);
-  background: var(--bg-input);
+  background: rgba(108, 92, 231, 0.1);
 }
 
 .wallet-card:disabled {
@@ -331,13 +353,18 @@ body {
 
 .wallet-card-logo {
   flex-shrink: 0;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
+  border-radius: 6px;
   overflow: hidden;
+}
+
+.wallet-card-logo svg {
+  width: 28px;
+  height: 28px;
 }
 
 .wallet-card-name {
@@ -345,15 +372,10 @@ body {
   text-align: left;
 }
 
-.wallet-chain-disabled {
-  opacity: 0.5;
-}
-
-.wallet-group-coming-soon {
-  font-size: 0.75rem;
-  color: var(--text-dim);
-  font-style: italic;
-  margin-left: auto;
+@media (max-width: 600px) {
+  .wallet-columns {
+    flex-direction: column;
+  }
 }
 
 .wallet-chain-badge {

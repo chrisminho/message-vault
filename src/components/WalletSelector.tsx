@@ -186,14 +186,14 @@ export default function WalletSelector() {
 
   return (
     <div className="wallet-selector">
-      <div className="wallet-chains">
-        {/* Solana */}
-        <div className="wallet-chain-section">
-          <div className="wallet-chain-header">
+      <div className="wallet-columns">
+        {/* Solana column */}
+        <div className="wallet-column">
+          <div className="wallet-column-header">
             <SolanaChainLogo />
-            <span className="wallet-chain-name">Solana</span>
+            <span className="wallet-column-chain">Solana</span>
           </div>
-          <div className="wallet-chain-wallets">
+          <div className="wallet-column-list">
             <button className="wallet-card" onClick={handleSolanaConnect}>
               <div className="wallet-card-logo"><PhantomLogo /></div>
               <span className="wallet-card-name">Phantom</span>
@@ -201,13 +201,13 @@ export default function WalletSelector() {
           </div>
         </div>
 
-        {/* Algorand */}
-        <div className="wallet-chain-section">
-          <div className="wallet-chain-header">
+        {/* Algorand column */}
+        <div className="wallet-column">
+          <div className="wallet-column-header">
             <AlgorandChainLogo />
-            <span className="wallet-chain-name">Algorand</span>
+            <span className="wallet-column-chain">Algorand</span>
           </div>
-          <div className="wallet-chain-wallets">
+          <div className="wallet-column-list">
             {algorandWallets?.map((wallet) => (
               <button
                 key={wallet.id}
@@ -221,14 +221,14 @@ export default function WalletSelector() {
           </div>
         </div>
 
-        {/* Ethereum */}
-        <div className="wallet-chain-section wallet-chain-disabled">
-          <div className="wallet-chain-header">
+        {/* Ethereum column */}
+        <div className="wallet-column wallet-column-disabled">
+          <div className="wallet-column-header">
             <EthereumChainLogo />
-            <span className="wallet-chain-name">Ethereum</span>
-            <span className="wallet-group-coming-soon">Coming Soon</span>
+            <span className="wallet-column-chain">Ethereum</span>
+            <span className="wallet-column-soon">Soon</span>
           </div>
-          <div className="wallet-chain-wallets">
+          <div className="wallet-column-list">
             <button className="wallet-card" disabled>
               <div className="wallet-card-logo"><MetaMaskLogo /></div>
               <span className="wallet-card-name">MetaMask</span>
