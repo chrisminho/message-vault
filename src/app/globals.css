@@ -266,54 +266,115 @@ body {
   gap: 8px;
 }
 
-.wallet-groups {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  width: 100%;
+.wallet-selector {
+  margin: 0 auto 32px;
 }
 
-.wallet-group {
+.wallet-columns {
+  display: flex;
+  gap: 16px;
+  width: 100%;
+  align-items: flex-start;
+}
+
+.wallet-column {
+  width: 20vw;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+
+.wallet-column-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+}
+
+.wallet-column-chain {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.wallet-column-soon {
+  font-size: 0.65rem;
+  color: var(--text-dim);
+  font-style: italic;
+  margin-left: auto;
+  background: var(--bg-input);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.wallet-column-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.wallet-column-disabled {
+  opacity: 0.45;
+}
+
+.wallet-card {
   display: flex;
   align-items: center;
   gap: 10px;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
+  width: 100%;
+  background: var(--bg-input);
+  border: 1px solid transparent;
   border-radius: 8px;
-  padding: 10px 14px;
-}
-
-.wallet-group-label {
-  font-size: 0.8rem;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.85rem;
   font-weight: 600;
-  color: var(--text-dim);
-  min-width: 70px;
 }
 
-.wallet-group-buttons {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
+.wallet-card:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: rgba(108, 92, 231, 0.1);
 }
 
-.wallet-group-buttons .btn {
-  padding: 6px 12px;
-  font-size: 0.8rem;
-}
-
-.wallet-group-disabled {
+.wallet-card:disabled {
   opacity: 0.5;
+  cursor: not-allowed;
 }
 
-.wallet-group-coming-soon {
-  font-size: 0.8rem;
-  color: var(--text-dim);
-  font-style: italic;
+.wallet-card-logo {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  overflow: hidden;
 }
 
-.wallet-selector {
-  max-width: 420px;
-  margin: 0 auto 32px;
+.wallet-card-logo svg {
+  width: 28px;
+  height: 28px;
+}
+
+.wallet-card-name {
+  flex: 1;
+  text-align: left;
+}
+
+@media (max-width: 600px) {
+  .wallet-columns {
+    flex-direction: column;
+  }
 }
 
 .wallet-chain-badge {
